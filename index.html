@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Workout Schedule</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Workout">
+<meta name="theme-color" content="#c8ff00">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0f;--surface:#111118;--card:#16161f;
+  --accent:#c8ff00;--accent2:#ff6b35;--accent3:#00d4ff;
+  --text:#f0f0f0;--muted:#555568;--border:#222230;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:'Cairo',sans-serif;min-height:100vh;overflow-x:hidden;padding-bottom:50px}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(200,255,0,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(200,255,0,0.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.container{max-width:600px;margin:0 auto;padding:28px 16px 16px;position:relative;z-index:1}
+
+/* ── iOS install hint ── */
+
+/* ── Modal overlay ── */
+#modal{display:none;position:fixed;inset:0;z-index:300;align-items:flex-end;justify-content:center}
+#modal.open{display:flex}
+#modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px)}
+#modal-box{position:relative;z-index:1;width:100%;max-width:600px;background:var(--card);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:24px 20px 36px;animation:slideUp 0.3s ease;max-height:85vh;overflow-y:auto}
+#modal-box::-webkit-scrollbar{display:none}
+.modal-handle{width:40px;height:4px;background:var(--border);border-radius:100px;margin:0 auto 20px}
+.modal-title{font-size:18px;font-weight:900;margin-bottom:4px}
+.modal-date{font-size:12px;color:var(--muted);margin-bottom:20px}
+.modal-close{position:absolute;top:20px;left:20px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
+
+.modal-ex-item{padding:12px 0;border-bottom:1px solid var(--border)}
+.modal-ex-item:last-child{border-bottom:none}
+.modal-ex-name{font-size:14px;font-weight:700;margin-bottom:6px}
+.modal-sets{display:flex;gap:6px;flex-wrap:wrap}
+.modal-set-chip{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700}
+.modal-set-chip.done{background:rgba(200,255,0,0.15);color:var(--accent);border:1px solid rgba(200,255,0,0.3)}
+.modal-set-chip.miss{background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid var(--border)}
+
+.modal-empty{text-align:center;padding:30px 0;color:var(--muted);font-size:14px}
+.modal-empty span{font-size:32px;display:block;margin-bottom:8px}
+
+/* ── Header ── */
+.header{text-align:center;margin-bottom:26px;animation:fadeDown 0.6s ease}
+.header h1{font-size:clamp(28px,7vw,46px);font-weight:900;line-height:1.1;letter-spacing:-0.5px}
+.header h1 span{color:var(--accent)}
+.header p{color:var(--muted);margin-top:6px;font-size:13px}
+
+/* ── Stats ── */
+.stats-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;animation:fadeUp 0.6s ease 0.05s both}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px 8px;text-align:center}
+.stat-num{font-size:22px;font-weight:900;color:var(--accent);line-height:1}
+.stat-label{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* ── Progress card (clickable) ── */
+.progress-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 18px;margin-bottom:20px;cursor:pointer;transition:border-color 0.2s;animation:fadeUp 0.6s ease 0.1s both;display:none}
+.progress-card:active{border-color:var(--accent)}
+.progress-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.progress-label-text{font-size:12px;font-weight:700;color:var(--muted)}
+.progress-right{display:flex;align-items:center;gap:8px}
+.progress-count{font-size:12px;font-weight:700;color:var(--accent)}
+.progress-hint{font-size:10px;color:var(--muted);opacity:0.7}
+.progress-bar-bg{background:var(--border);border-radius:100px;height:7px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),#a0ff00);border-radius:100px;transition:width 0.4s ease;width:0%}
+
+/* ── Day tabs ── */
+.day-tabs{display:flex;gap:7px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;animation:fadeUp 0.6s ease 0.15s both}
+.day-tabs::-webkit-scrollbar{display:none}
+.day-tab{flex-shrink:0;background:var(--card);border:1px solid var(--border);color:var(--muted);padding:8px 15px;border-radius:10px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px;font-weight:600;transition:all 0.2s;white-space:nowrap;user-select:none}
+.day-tab.active{background:var(--accent);border-color:var(--accent);color:#000;font-weight:900}
+.day-tab.rest{opacity:0.35;cursor:default}
+
+/* ── Day content ── */
+.day-content{display:none;animation:fadeIn 0.25s ease}
+.day-content.active{display:block}
+
+.day-header{background:var(--card);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:18px 20px;display:flex;align-items:center;gap:14px;border-bottom:none}
+.day-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.day-icon.push{background:rgba(200,255,0,0.12)}
+.day-icon.pull{background:rgba(0,212,255,0.12)}
+.day-icon.legs{background:rgba(255,107,53,0.12)}
+.day-icon.upper{background:rgba(200,255,0,0.12)}
+.day-icon.lower{background:rgba(255,107,53,0.12)}
+.day-title{font-size:17px;font-weight:900}
+.day-subtitle{font-size:11px;color:var(--muted);margin-top:2px}
+.muscles-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.chip{font-size:10px;padding:2px 9px;border-radius:20px;font-weight:600}
+.chip.green{background:rgba(200,255,0,0.12);color:var(--accent)}
+.chip.blue{background:rgba(0,212,255,0.12);color:var(--accent3)}
+.chip.orange{background:rgba(255,107,53,0.12);color:var(--accent2)}
+
+/* ── Exercise list ── */
+.exercises-list{background:var(--card);border:1px solid var(--border);border-radius:0 0 16px 16px;overflow:hidden}
+.exercise-row{border-bottom:1px solid var(--border)}
+.exercise-row:last-child{border-bottom:none}
+
+.exercise-header{display:flex;align-items:center;padding:14px 18px;cursor:pointer;gap:12px;user-select:none;transition:background 0.15s}
+.exercise-header:active{background:rgba(255,255,255,0.02)}
+
+.ex-dot{width:9px;height:9px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;transition:all 0.2s}
+.ex-dot.partial{border-color:var(--accent);background:rgba(200,255,0,0.3)}
+.ex-dot.full{border-color:var(--accent);background:var(--accent)}
+
+.ex-info{flex:1;min-width:0}
+.ex-name{font-size:13px;font-weight:700;line-height:1.3}
+.ex-name.all-done{text-decoration:line-through;opacity:0.45}
+.ex-muscle{font-size:11px;color:var(--muted);margin-top:1px}
+
+.ex-summary{display:flex;gap:5px;flex-shrink:0;align-items:center}
+.set-badge{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700;color:var(--accent);white-space:nowrap}
+.expand-arrow{color:var(--muted);font-size:11px;transition:transform 0.25s;flex-shrink:0}
+.exercise-row.open .expand-arrow{transform:rotate(180deg)}
+
+/* ── Sets panel ── */
+.sets-panel{max-height:0;overflow:hidden;transition:max-height 0.3s ease;background:rgba(0,0,0,0.15)}
+.exercise-row.open .sets-panel{max-height:500px}
+.sets-inner{padding:10px 16px 14px;display:flex;flex-direction:column;gap:7px}
+
+.ex-tip{font-size:11px;color:#aaa;padding:8px 12px;background:rgba(200,255,0,0.04);border:1px solid rgba(200,255,0,0.1);border-radius:8px;line-height:1.5;margin-bottom:2px}
+
+.set-row{display:flex;align-items:center;gap:11px;padding:11px 13px;background:var(--card);border:1px solid var(--border);border-radius:10px;cursor:pointer;user-select:none;transition:all 0.15s}
+.set-row:active{background:rgba(200,255,0,0.03)}
+.set-row.set-done{border-color:rgba(200,255,0,0.3);background:rgba(200,255,0,0.05)}
+
+.set-check{width:21px;height:21px;border-radius:6px;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all 0.2s;color:#000;font-weight:900}
+.set-row.set-done .set-check{background:var(--accent);border-color:var(--accent)}
+
+.set-label{font-size:13px;font-weight:700;flex:1}
+.set-label.done-text{color:var(--muted);text-decoration:line-through}
+.set-reps{font-size:11px;color:var(--muted)}
+.set-row.set-done .set-reps{color:var(--accent)}
+
+/* ── Tips section ── */
+.tips-card{background:var(--card);border:1px solid rgba(200,255,0,0.12);border-radius:14px;padding:16px 18px;margin-top:16px;animation:fadeUp 0.6s ease 0.25s both}
+.tips-title{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
+.tip-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#888;line-height:1.55;margin-bottom:7px}
+.tip-item:last-child{margin-bottom:0}
+.tip-icon{font-size:13px;flex-shrink:0;margin-top:1px}
+
+/* ── Reset ── */
+.reset-btn{display:block;width:100%;margin-top:14px;background:none;border:1px solid var(--border);color:var(--muted);font-family:'Cairo',sans-serif;font-size:13px;font-weight:600;padding:12px;border-radius:12px;cursor:pointer;transition:all 0.2s;animation:fadeUp 0.6s ease 0.3s both}
+.reset-btn:active{border-color:rgba(255,100,100,0.4);color:rgba(255,100,100,0.7)}
+
+@keyframes fadeDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<!-- Daily summary modal -->
+<div id="modal">
+  <div id="modal-backdrop" onclick="closeModal()"></div>
+  <div id="modal-box">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="header">
+    <h1>Workout<br><span>Schedule</span></h1>
+    <p>٥ أيام تمرين — كل عضلة مرتين في الأسبوع</p>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat"><div class="stat-num">٥</div><div class="stat-label">أيام تمرين</div></div>
+    <div class="stat"><div class="stat-num">٢x</div><div class="stat-label">لكل عضلة</div></div>
+    <div class="stat"><div class="stat-num">٢</div><div class="stat-label">أيام راحة</div></div>
+  </div>
+
+  <!-- Clickable progress card -->
+  <div class="progress-card" id="progressCard" onclick="openDaySummary()">
+    <div class="progress-top">
+      <span class="progress-label-text">تقدم اليوم</span>
+      <div class="progress-right">
+        <span class="progress-count" id="progressText">0 / 0 سيت</span>
+        <span class="progress-hint">اضغط للتفاصيل ›</span>
+      </div>
+    </div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+  </div>
+
+  <div class="day-tabs" id="dayTabs"></div>
+  <div id="dayContents"></div>
+
+  <!-- Tips -->
+  <div class="tips-card">
+    <div class="tips-title">نصائح للمبتدئ</div>
+    <div class="tip-item"><span class="tip-icon">🎯</span><span>الشكل الصح أهم من الوزن — تعلم الحركة قبل ما تثقّل</span></div>
+    <div class="tip-item"><span class="tip-icon">⏱️</span><span>راحة 90 ثانية بين كل سيت</span></div>
+    <div class="tip-item"><span class="tip-icon">📈</span><span>زد الوزن بس لما تكمل كل السيتات بسهولة</span></div>
+    <div class="tip-item"><span class="tip-icon">🥩</span><span>1.6 غرام بروتين لكل كغ من وزنك يومياً</span></div>
+    <div class="tip-item"><span class="tip-icon">😴</span><span>7-8 ساعات نوم — العضل يبني وقت النوم مو وقت التمرين</span></div>
+    <div class="tip-item"><span class="tip-icon">💧</span><span>اشرب 3-4 لتر ماء يومياً</span></div>
+  </div>
+
+  <button class="reset-btn" onclick="resetWeek()">🔄 إعادة تعيين الأسبوع</button>
+</div>
+
+<div style="position:fixed;bottom:16px;left:16px;z-index:50;pointer-events:none">
+  <span style="font-family:'Cairo',sans-serif;font-size:11px;font-weight:700;color:rgba(200,255,0,0.25);letter-spacing:2px;text-transform:uppercase">Alshamari</span>
+</div>
+
+<script>
+// ── Schedule data ─────────────────────────────────────────
+const schedule = [
+  {
+    id:'mon', label:'الاثنين', type:'push', icon:'🫸',
+    title:'Push — دفع', subtitle:'صدر + أكتاف + ترايسبس',
+    muscles:[{label:'صدر',color:'green'},{label:'أكتاف',color:'green'},{label:'ترايسبس',color:'green'}],
+    exercises:[
+      {name:'Bench Press',               muscle:'صدر — وسط',     sets:3, reps:'10', tip:'ظهرك ثابت على المقعد، نزّل الوزن ببطء'},
+      {name:'Incline Dumbbell Press',    muscle:'صدر — علوي',    sets:3, reps:'10', tip:'زاوية 30-45 درجة، لا تفتح كوعك كثير'},
+      {name:'Machine Chest Fly',         muscle:'صدر',           sets:3, reps:'12', tip:'احس بالمط في الصدر، لا تقفل الذراعين'},
+      {name:'Dumbbell Shoulder Press',   muscle:'أكتاف',         sets:3, reps:'10', tip:'لا ترفع الوزن فوق الرأس بقوة'},
+      {name:'Lateral Raises',            muscle:'أكتاف جانبية',  sets:3, reps:'15', tip:'وزن خفيف، ارفع ببطء لمستوى الكتف'},
+      {name:'Tricep Pushdown (Cable)',   muscle:'ترايسبس',       sets:3, reps:'12', tip:'كوعك ثابت بجانب جسمك طول الوقت'},
+    ]
+  },
+  {
+    id:'tue', label:'الثلاثاء', type:'pull', icon:'🫷',
+    title:'Pull — سحب', subtitle:'ظهر + بايسبس',
+    muscles:[{label:'ظهر',color:'blue'},{label:'بايسبس',color:'blue'}],
+    exercises:[
+      {name:'Lat Pulldown',              muscle:'ظهر عريض',      sets:3, reps:'10', tip:'اسحب للصدر مو للرقبة، احس بالظهر'},
+      {name:'Seated Cable Row',          muscle:'ظهر أوسط',      sets:3, reps:'10', tip:'ظهرك مستقيم، شد الكتف للخلف'},
+      {name:'Dumbbell Row',              muscle:'ظهر جانبي',     sets:3, reps:'10', tip:'ضع ركبتك وإيدك على المقعد للاتزان'},
+      {name:'Face Pulls',                muscle:'أكتاف خلفية',   sets:3, reps:'15', tip:'مهم لصحة الكتف، لا تتخطاه أبد'},
+      {name:'Dumbbell Bicep Curl',       muscle:'بايسبس',        sets:3, reps:'12', tip:'لا تتأرجح، الحركة من الكوع فقط'},
+      {name:'Hammer Curl',               muscle:'بايسبس — برا',  sets:3, reps:'12', tip:'إمسك الدمبل عمودي مثل المطرقة'},
+    ]
+  },
+  {
+    id:'wed', label:'الأربعاء', type:'legs', icon:'🦵',
+    title:'Legs — أرجل', subtitle:'أرجل كاملة + سمانة',
+    muscles:[{label:'كوادز',color:'orange'},{label:'هامسترينج',color:'orange'},{label:'سمانة',color:'orange'}],
+    exercises:[
+      {name:'Goblet Squat',              muscle:'أرجل كاملة',    sets:3, reps:'12', tip:'أسهل للمبتدئ، ظهرك مستقيم وركبتك فوق أصابعك'},
+      {name:'Leg Press',                 muscle:'كوادز',         sets:3, reps:'12', tip:'قدميك بعرض الكتف، لا تقفل الركبة'},
+      {name:'Romanian Deadlift',         muscle:'هامسترينج',     sets:3, reps:'10', tip:'الوزن قريب من الجسم، احس بشد الهامسترينج'},
+      {name:'Leg Extension',             muscle:'كوادز',         sets:3, reps:'15', tip:'ابدأ بوزن خفيف، تمرين عزل آمن'},
+      {name:'Leg Curl (Machine)',         muscle:'هامسترينج',     sets:3, reps:'15', tip:'لا ترفع وركك عن المقعد'},
+      {name:'Calf Raises',               muscle:'سمانة',         sets:3, reps:'20', tip:'ارفع على أطراف أصابعك ببطء واحس بالضغط'},
+    ]
+  },
+  {
+    id:'thu', label:'الخميس', type:'upper', icon:'💪',
+    title:'Upper — الجسم العلوي', subtitle:'صدر + ظهر + أكتاف',
+    muscles:[{label:'صدر',color:'green'},{label:'ظهر',color:'blue'},{label:'أكتاف',color:'green'}],
+    exercises:[
+      {name:'Dumbbell Bench Press',      muscle:'صدر',           sets:3, reps:'10', tip:'يحمّل كل جانب لحاله، أفضل للتوازن'},
+      {name:'Cable Row (Wide Grip)',     muscle:'ظهر علوي',      sets:3, reps:'10', tip:'يشتغل على الجزء العلوي من الظهر'},
+      {name:'Machine Shoulder Press',   muscle:'أكتاف',         sets:3, reps:'10', tip:'أكثر أمان للمبتدئ من الباربيل'},
+      {name:'Assisted Pull-ups',         muscle:'ظهر عريض',      sets:3, reps:'8',  tip:'استخدم المكينة المساعدة إذا ما تقدر'},
+      {name:'Pec Deck (Machine Fly)',    muscle:'صدر',           sets:3, reps:'12', tip:'احس بالمط في الصدر، لا تقفل الذراعين'},
+      {name:'Cable Lateral Raise',       muscle:'أكتاف جانبية',  sets:3, reps:'15', tip:'الكابل يبقي التوتر طول الحركة'},
+    ]
+  },
+  {
+    id:'fri', label:'الجمعة', type:'lower', icon:'🏃',
+    title:'Lower + Arms', subtitle:'أرجل + ذراعين',
+    muscles:[{label:'أرجل',color:'orange'},{label:'بايسبس',color:'blue'},{label:'ترايسبس',color:'green'}],
+    exercises:[
+      {name:'Hack Squat (Machine)',      muscle:'كوادز',         sets:3, reps:'12', tip:'أسهل على الظهر من السكوات العادي'},
+      {name:'Walking Lunges',            muscle:'أرجل كاملة',    sets:3, reps:'10 لكل رجل', tip:'خطوات واسعة، ركبتك لا تتجاوز أصابع قدمك'},
+      {name:'Seated Leg Curl',           muscle:'هامسترينج',     sets:3, reps:'12', tip:'حرك ببطء خصوصاً في مرحلة الرجوع'},
+      {name:'EZ Bar Curl',               muscle:'بايسبس',        sets:3, reps:'12', tip:'القضيب الإي زد أريح للمعصم من الباربيل'},
+      {name:'Overhead Tricep Extension', muscle:'ترايسبس',       sets:3, reps:'12', tip:'كوعك قريب من رأسك، لا تفتحه للجانب'},
+      {name:'Calf Raises',               muscle:'سمانة',         sets:3, reps:'20', tip:'ارفع على أطراف أصابعك ببطء'},
+    ]
+  },
+  {id:'sat', label:'السبت', rest:true},
+  {id:'sun', label:'الأحد',  rest:true},
+];
+
+// ── State ─────────────────────────────────────────────────
+const KEY = 'workout_v3';
+let state = {};
+
+function loadState() {
+  try { const s = localStorage.getItem(KEY); if(s) state = JSON.parse(s); } catch(e){}
+  schedule.forEach(day => {
+    if(day.rest) return;
+    if(!state[day.id]) state[day.id] = {};
+    day.exercises.forEach((ex,ei) => {
+      if(!state[day.id][ei]) state[day.id][ei] = new Array(ex.sets).fill(false);
+    });
+  });
+}
+
+function saveState() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){}
+}
+
+function resetWeek() {
+  if(!confirm('تبي تعيد الأسبوع من البداية؟')) return;
+  schedule.forEach(day => {
+    if(day.rest) return;
+    state[day.id] = {};
+    day.exercises.forEach((ex,ei) => { state[day.id][ei] = new Array(ex.sets).fill(false); });
+  });
+  saveState();
+  buildUI();
+  switchDay(currentDay);
+}
+
+// ── Modal — daily summary ─────────────────────────────────
+function openDaySummary() {
+  const day = schedule.find(d => d.id === currentDay);
+  if(!day || day.rest) return;
+
+  const dayState = state[currentDay];
+  const dayNames = {mon:'الاثنين',tue:'الثلاثاء',wed:'الأربعاء',thu:'الخميس',fri:'الجمعة'};
+
+  let totalDone = 0, totalSets = 0;
+  day.exercises.forEach((ex,ei) => {
+    const sets = dayState[ei] || [];
+    totalDone += sets.filter(Boolean).length;
+    totalSets += ex.sets;
+  });
+
+  let html = '';
+  if(totalDone === 0) {
+    html = `<div class="modal-empty"><span>💤</span>ما سويت شي اليوم بعد<br><small style="color:var(--muted)">اضغط على التمارين وابدأ!</small></div>`;
+  } else {
+    html = day.exercises.map((ex,ei) => {
+      const sets = dayState[ei] || new Array(ex.sets).fill(false);
+      const chips = sets.map((done,si) =>
+        `<span class="modal-set-chip ${done?'done':'miss'}">سيت ${si+1}${done?' ✓':''}</span>`
+      ).join('');
+      return `
+        <div class="modal-ex-item">
+          <div class="modal-ex-name">${ex.name}</div>
+          <div class="modal-sets">${chips}</div>
+        </div>`;
+    }).join('');
+  }
+
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-title">${day.title}</div>
+    <div class="modal-date">${dayNames[currentDay]} — ${totalDone} من ${totalSets} سيت مكتمل</div>
+    ${html}
+  `;
+
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// ── Build UI ──────────────────────────────────────────────
+let currentDay = 'mon';
+
+function buildUI() {
+  const tabs = document.getElementById('dayTabs');
+  const contents = document.getElementById('dayContents');
+  tabs.innerHTML = '';
+  contents.innerHTML = '';
+
+  const todayIdx = new Date().getDay();
+  const today = ['sun','mon','tue','wed','thu','fri','sat'][todayIdx];
+
+  schedule.forEach(day => {
+    const isToday = day.id === today;
+    const tab = document.createElement('button');
+    tab.className = 'day-tab' + (day.rest?' rest':'') + (day.id===currentDay?' active':'');
+    tab.textContent = day.label + (isToday && !day.rest ? ' 🔥' : '');
+    tab.dataset.id = day.id;
+    if(!day.rest) tab.onclick = () => switchDay(day.id);
+    tabs.appendChild(tab);
+    if(day.rest) return;
+
+    const div = document.createElement('div');
+    div.className = 'day-content' + (day.id===currentDay?' active':'');
+    div.id = 'content-' + day.id;
+
+    const chips = day.muscles.map(m=>`<span class="chip ${m.color}">${m.label}</span>`).join('');
+
+    const exRows = day.exercises.map((ex,ei) => {
+      const sets = state[day.id][ei] || new Array(ex.sets).fill(false);
+      const doneSets = sets.filter(Boolean).length;
+      const allDone = doneSets === ex.sets;
+      const dotCls = allDone?' full':doneSets>0?' partial':'';
+
+      const setItems = sets.map((done,si) => `
+        <div class="set-row${done?' set-done':''}" id="setrow-${day.id}-${ei}-${si}" onclick="toggleSet('${day.id}',${ei},${si})">
+          <div class="set-check">${done?'✓':''}</div>
+          <div class="set-label${done?' done-text':''}">سيت ${si+1}</div>
+          <div class="set-reps">${ex.reps} تكرار</div>
+        </div>`).join('');
+
+      const tipHtml = ex.tip ? `<div class="ex-tip">💡 ${ex.tip}</div>` : '';
+
+      return `
+        <div class="exercise-row" id="exrow-${day.id}-${ei}">
+          <div class="exercise-header" onclick="toggleExpand('${day.id}',${ei})">
+            <div class="ex-dot${dotCls}" id="dot-${day.id}-${ei}"></div>
+            <div class="ex-info">
+              <div class="ex-name${allDone?' all-done':''}" id="exname-${day.id}-${ei}">${ex.name}</div>
+              <div class="ex-muscle">${ex.muscle}</div>
+            </div>
+            <div class="ex-summary">
+              <div class="set-badge" id="setcount-${day.id}-${ei}">${doneSets}/${ex.sets}</div>
+              <div class="set-badge">${ex.reps}×</div>
+            </div>
+            <div class="expand-arrow">▾</div>
+          </div>
+          <div class="sets-panel">
+            <div class="sets-inner">${tipHtml}${setItems}</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    div.innerHTML = `
+      <div class="day-header">
+        <div class="day-icon ${day.type}">${day.icon}</div>
+        <div>
+          <div class="day-title">${day.title}</div>
+          <div class="day-subtitle">${day.subtitle}</div>
+          <div class="muscles-chips">${chips}</div>
+        </div>
+      </div>
+      <div class="exercises-list">${exRows}</div>`;
+
+    contents.appendChild(div);
+  });
+
+  document.getElementById('progressCard').style.display = 'block';
+  updateProgress(currentDay);
+}
+
+function toggleExpand(dayId, ei) {
+  document.getElementById(`exrow-${dayId}-${ei}`).classList.toggle('open');
+}
+
+function toggleSet(dayId, ei, si) {
+  state[dayId][ei][si] = !state[dayId][ei][si];
+  saveState();
+
+  const done = state[dayId][ei][si];
+  const row = document.getElementById(`setrow-${dayId}-${ei}-${si}`);
+  row.classList.toggle('set-done', done);
+  row.querySelector('.set-check').textContent = done ? '✓' : '';
+  row.querySelector('.set-label').className = 'set-label' + (done?' done-text':'');
+
+  const sets = state[dayId][ei];
+  const doneSets = sets.filter(Boolean).length;
+  const total = sets.length;
+  const allDone = doneSets === total;
+
+  document.getElementById(`dot-${dayId}-${ei}`).className = 'ex-dot' + (allDone?' full':doneSets>0?' partial':'');
+  document.getElementById(`setcount-${dayId}-${ei}`).textContent = `${doneSets}/${total}`;
+  document.getElementById(`exname-${dayId}-${ei}`).className = 'ex-name' + (allDone?' all-done':'');
+
+  updateProgress(dayId);
+}
+
+function switchDay(id) {
+  currentDay = id;
+  document.querySelectorAll('.day-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelector(`[data-id="${id}"]`).classList.add('active');
+  document.querySelectorAll('.day-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('content-'+id).classList.add('active');
+  updateProgress(id);
+}
+
+function updateProgress(dayId) {
+  const day = schedule.find(d=>d.id===dayId);
+  if(!day||day.rest) return;
+  let done=0, total=0;
+  day.exercises.forEach((ex,ei) => {
+    const sets = state[dayId][ei]||[];
+    done += sets.filter(Boolean).length;
+    total += ex.sets;
+  });
+  document.getElementById('progressText').textContent = `${done} / ${total} سيت`;
+  document.getElementById('progressFill').style.width = total?(done/total*100)+'%':'0%';
+}
+
+
+// ── Service Worker ────────────────────────────────────────
+if('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
+
+// ── Init ──────────────────────────────────────────────────
+loadState();
+const todayId = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
+const todayIsWorkout = schedule.find(d=>d.id===todayId&&!d.rest);
+currentDay = todayIsWorkout ? todayId : 'mon';
+buildUI();
+</script>
+</body>
+</html>
